@@ -17,7 +17,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'change-me-super-secret';
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, 'messenger.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
+const UPLOADS_DIR = path.join('/data', 'uploads');
 const AVATARS_DIR = path.join(UPLOADS_DIR, 'avatars');
 const IMAGES_DIR = path.join(UPLOADS_DIR, 'images');
 
