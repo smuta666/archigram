@@ -1,0 +1,19 @@
+{
+  "name": "friend-messenger",
+  "version": "1.1.0",
+  "description": "Simple private web messenger for friends (Windows-friendly)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cookie": "^1.0.2",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
+    "ws": "^8.18.0"
+  }
+}
