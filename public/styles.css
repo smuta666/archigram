@@ -852,7 +852,67 @@ button {
   opacity: 0.85;
 }
 
+/* === custom voice player === */
 
+.voice-message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 220px;
+  max-width: 280px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
+}
+
+.message.mine .voice-message {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.voice-play {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+  padding: 0;
+}
+
+.voice-play:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.voice-progress {
+  position: relative;
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+.voice-progress-bar {
+  width: 0%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #85a6ff 0%, #5d84ff 100%);
+  transition: width 0.08s linear;
+}
+
+.voice-time {
+  min-width: 34px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 
 @media (max-width: 900px) {
   html,
@@ -1065,5 +1125,23 @@ button {
 
   .clear-voice-btn span {
     display: none;
+  }
+
+  .voice-message {
+    min-width: 190px;
+    max-width: 240px;
+    padding: 9px 10px;
+    gap: 8px;
+  }
+
+  .voice-play {
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
+  }
+
+  .voice-time {
+    font-size: 11px;
+    min-width: 30px;
   }
 }
