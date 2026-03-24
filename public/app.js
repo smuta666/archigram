@@ -46,6 +46,10 @@ const typingIndicator = document.getElementById('typing-indicator');
 //const voiceStatus = document.getElementById('voice-status');
 //const voiceStatusText = document.getElementById('voice-status-text');
 //const clearVoiceBtn = document.getElementById('clear-voice-btn');
+const imageViewer = document.getElementById('image-viewer');
+const imageViewerBackdrop = document.getElementById('image-viewer-backdrop');
+const imageViewerClose = document.getElementById('image-viewer-close');
+const imageViewerImg = document.getElementById('image-viewer-img');
 const openProfileBtn = document.getElementById('open-profile-btn');
 const profileModal = document.getElementById('profile-modal');
 const profileBackdrop = document.getElementById('profile-backdrop');
@@ -125,6 +129,20 @@ function urlBase64ToUint8Array(base64String) {
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = atob(base64);
   return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+}
+
+function openImageViewer(src) {
+  if (!imageViewer || !imageViewerImg) return;
+  imageViewerImg.src = src;
+  imageViewer.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeImageViewer() {
+  if (!imageViewer || !imageViewerImg) return;
+  imageViewer.classList.add('hidden');
+  imageViewerImg.src = '';
+  document.body.style.overflow = '';
 }
 
 async function api(url, options = {}) {
@@ -371,6 +389,15 @@ enablePushBtn?.addEventListener('click', async () => {
   }
 });
 
+imageViewerBackdrop?.addEventListener('click', closeImageViewer);
+imageViewerClose?.addEventListener('click', closeImageViewer);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && imageViewer && !imageViewer.classList.contains('hidden')) {
+    closeImageViewer();
+  }
+});
+
 //recordVoiceBtn?.addEventListener('click', async () => {
   //await startVoiceRecording();
 //});
@@ -595,6 +622,7 @@ function renderMessages() {
       img.src = message.content;
       img.alt = 'image';
       img.addEventListener('load', () => scrollMessagesToBottom(true));
+      img.addEventListener('click', () => openImageViewer(message.content));
       div.appendChild(img);
     } else if (message.type === 'voice') {
       if (!isDesktopVoiceUI()) {
