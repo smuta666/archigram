@@ -124,39 +124,22 @@ const uploadAvatar = multer({
 const chatUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, file, cb) => {
-      if (file.fieldname === 'image') {
+      if (file.mimetype.startsWith('image/')) {
         return cb(null, IMAGES_DIR);
       }
 
-      if (file.fieldname === 'voice') {
+      if (file.mimetype.startsWith('audio/')) {
         return cb(null, VOICE_DIR);
       }
 
-      cb(new Error('Unsupported file field'));
+      cb(new Error('Unsupported file type'));
     },
     filename: (_req, file, cb) => {
-      const ext =
-        path.extname(file.originalname || '').toLowerCase() ||
-        (file.fieldname === 'voice' ? '.webm' : '.bin');
-
+      const ext = path.extname(file.originalname || '').toLowerCase() || '.bin';
       cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
     }
   }),
-  limits: { fileSize: 15 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (file.fieldname === 'image') {
-      if (!file.mimetype || file.mimetype.startsWith('image/')) {
-        return cb(null, true);
-      }
-      return cb(new Error('Only image files are allowed'));
-    }
-
-    if (file.fieldname === 'voice') {
-      return cb(null, true);
-    }
-
-    cb(new Error('Unsupported file field'));
-  }
+  limits: { fileSize: 15 * 1024 * 1024 }
 });
 
 const uploadImage = multer({
