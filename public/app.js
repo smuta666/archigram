@@ -862,13 +862,17 @@ function upsertChatPreview(message) {
   renderChats();
 }
 
-function handleIncomingMessage(message) {
+async function handleIncomingMessage(message) {
   upsertChatPreview(message);
 
   if (state.currentChat?.id === message.chat_id) {
     state.currentMessages.push(message);
     renderMessages();
     scrollMessagesToBottom(true);
+
+    if (message.sender_id !== state.me.id) {
+      await markCurrentChatAsRead();
+    }
   }
 }
 
@@ -877,8 +881,22 @@ function connectWebSocket() {
   const ws = new WebSocket(`${protocol}//${location.host}/ws`);
   state.ws = ws;
 
-  ws.addEventListener('message', (event) => {
+  ws.addEventListener('message', async (event) => {
     const data = JSON.parse(event.data);
+
+    if (data.type === 'new_message') {
+      await handleIncomingMessage(data.message);
+    }
+
+    if (data.type === 'messages_read') {
+      state.currentMessages = state.currentMessages.map(message =>
+        data.messageIds.includes(message.id)
+          ? { ...message, read_at: data.readAt }
+          : message
+      );
+
+      renderMessages();
+    }
 
     if (data.type === 'connected' || data.type === 'presence') {
       state.onlineUserIds = new Set(data.onlineUserIds || []);
@@ -890,20 +908,6 @@ function connectWebSocket() {
           ? 'В сети'
           : 'Не в сети';
       }
-    }
-
-    if (data.type === 'new_message') {
-      handleIncomingMessage(data.message);
-    }
-
-    if (data.type === 'messages_read') {
-      state.currentMessages = state.currentMessages.map(message =>
-        data.messageIds.includes(message.id)
-          ? { ...message, read_at: data.readAt }
-          : message
-      );
-
-      renderMessages();
     }
 
     if (data.type === 'typing' && state.currentChat?.id === data.chatId) {
