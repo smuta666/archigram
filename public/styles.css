@@ -228,6 +228,8 @@ button {
   display: grid;
   grid-template-columns: 320px 1fr;
   min-height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -236,6 +238,8 @@ button {
     linear-gradient(180deg, rgba(15, 21, 36, 0.97), rgba(12, 17, 29, 0.98));
   padding: 18px;
   overflow-y: auto;
+  min-height: 0;
+  height: 100vh;
   backdrop-filter: blur(16px);
 }
 
@@ -342,8 +346,10 @@ button {
 .chat-panel {
   min-width: 0;
   min-height: 0;
+  height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background:
     radial-gradient(circle at top, rgba(124, 156, 255, 0.05), transparent 22%),
     linear-gradient(180deg, rgba(10, 14, 24, 0.9), rgba(10, 13, 22, 1));
@@ -371,9 +377,11 @@ button {
 }
 
 .full-height {
-  height: 100vh;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .chat-header {
