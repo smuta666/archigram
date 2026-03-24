@@ -566,9 +566,13 @@ function renderChats() {
   chatsList.innerHTML = '';
 
   for (const chat of state.chats) {
-    const right = document.createElement('div');
-    right.className = 'preview-text muted small';
-    right.title = chat.last_message
+    const rightWrap = document.createElement('div');
+    rightWrap.className = 'chat-right';
+
+    const preview = document.createElement('div');
+    preview.className = 'preview-text muted small';
+
+    preview.title = chat.last_message
       ? (
           chat.last_message.type === 'image'
             ? '📷 Картинка'
@@ -578,7 +582,7 @@ function renderChats() {
         )
       : 'Пустой чат';
 
-    right.textContent = chat.last_message
+    preview.textContent = chat.last_message
       ? (
           chat.last_message.type === 'image'
             ? '📷 Картинка'
@@ -587,15 +591,24 @@ function renderChats() {
               : chat.last_message.content
         )
       : 'Пустой чат';
+
+    rightWrap.appendChild(preview);
+
+    if (chat.unread_count > 0) {
+      const badge = document.createElement('div');
+      badge.className = 'chat-unread-badge';
+      badge.textContent = chat.unread_count > 99 ? '99+' : String(chat.unread_count);
+      rightWrap.appendChild(badge);
+    }
 
     const item = createListItem(
       chat.partner,
-      right,
+      rightWrap,
       state.onlineUserIds.has(chat.partner.id)
     );
 
-    item.dataset.chatId = String(chat.id);
     item.classList.toggle('active', state.currentChat?.id === chat.id);
+    item.addEventListener('click', () => openChat(chat.id));
     chatsList.appendChild(item);
   }
 }
@@ -785,7 +798,14 @@ async function markCurrentChatAsRead() {
           : message
       );
 
+      state.chats = state.chats.map(chat =>
+        chat.id === state.currentChat.id
+          ? { ...chat, unread_count: 0 }
+          : chat
+      );
+
       renderMessages();
+      renderChats();
     }
   } catch (error) {
     console.error('markCurrentChatAsRead error:', error);
@@ -865,6 +885,22 @@ function upsertChatPreview(message) {
 async function handleIncomingMessage(message) {
   upsertChatPreview(message);
 
+  state.chats = state.chats.map(chat => {
+    if (chat.id !== message.chat_id) return chat;
+
+    const isIncoming = message.sender_id !== state.me.id;
+    const isOpenedNow = state.currentChat?.id === message.chat_id;
+
+    return {
+      ...chat,
+      unread_count: isIncoming
+        ? (isOpenedNow ? 0 : (chat.unread_count || 0) + 1)
+        : (chat.unread_count || 0)
+    };
+  });
+
+  renderChats();
+
   if (state.currentChat?.id === message.chat_id) {
     state.currentMessages.push(message);
     renderMessages();
@@ -895,7 +931,16 @@ function connectWebSocket() {
           : message
       );
 
+      if (state.currentChat?.id === data.chatId) {
+        state.chats = state.chats.map(chat =>
+          chat.id === data.chatId
+            ? { ...chat, unread_count: 0 }
+            : chat
+        );
+      }
+
       renderMessages();
+      renderChats();
     }
 
     if (data.type === 'connected' || data.type === 'presence') {

@@ -549,20 +549,30 @@ app.get('/api/chats', authMiddleware, (req, res) => {
     .filter((chat) => chat.user1_id === req.user.id || chat.user2_id === req.user.id)
     .map((chat) => {
       const partner = getPartnerFromChat(chat, req.user.id);
-      const lastMessage = db.messages
-        .filter((message) => message.chat_id === chat.id)
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at) || b.id - a.id)[0] || null;
+
+      const chatMessages = db.messages.filter((message) => message.chat_id === chat.id);
+
+      const lastMessage =
+        chatMessages
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at) || b.id - a.id)[0] || null;
+
+      const unreadCount = chatMessages.filter((message) =>
+        message.sender_id !== req.user.id && !message.read_at
+      ).length;
 
       return {
         id: chat.id,
         partner,
         partner_is_online: partner ? onlineSet.has(partner.id) : false,
-        last_message: lastMessage ? {
-          id: lastMessage.id,
-          type: lastMessage.type,
-          content: lastMessage.content,
-          created_at: lastMessage.created_at
-        } : null,
+        unread_count: unreadCount,
+        last_message: lastMessage
+          ? {
+              id: lastMessage.id,
+              type: lastMessage.type,
+              content: lastMessage.content,
+              created_at: lastMessage.created_at
+            }
+          : null,
         sort_time: lastMessage ? lastMessage.created_at : chat.created_at
       };
     })

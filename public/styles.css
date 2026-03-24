@@ -1012,6 +1012,30 @@ button {
   color: #8fb2ff;
 }
 
+.chat-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 170px;
+}
+
+.chat-unread-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #85a6ff 0%, #5d84ff 100%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 6px 16px rgba(93, 132, 255, 0.3);
+}
+
 @media (max-width: 900px) {
   html,
   body {
@@ -1267,5 +1291,17 @@ button {
 
   .read-mark {
     font-size: 11px;
+  }
+
+  .chat-right {
+    max-width: 130px;
+    gap: 6px;
+  }
+
+  .chat-unread-badge {
+    min-width: 18px;
+    height: 18px;
+    font-size: 10px;
+    padding: 0 5px;
   }
 }
