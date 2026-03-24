@@ -8,21 +8,36 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const cookie = require('cookie');
+const webPush = require('web-push');
 const { WebSocketServer } = require('ws');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-super-secret';
+
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, 'messenger.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const UPLOADS_DIR = path.join('/data', 'uploads');
+const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const AVATARS_DIR = path.join(UPLOADS_DIR, 'avatars');
 const IMAGES_DIR = path.join(UPLOADS_DIR, 'images');
+const VOICE_DIR = path.join(UPLOADS_DIR, 'voice');
 
-for (const dir of [DATA_DIR, UPLOADS_DIR, AVATARS_DIR, IMAGES_DIR]) {
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@example.com';
+
+for (const dir of [DATA_DIR, UPLOADS_DIR, AVATARS_DIR, IMAGES_DIR, VOICE_DIR]) {
   fs.mkdirSync(dir, { recursive: true });
+}
+
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webPush.setVapidDetails(
+    VAPID_SUBJECT,
+    VAPID_PUBLIC_KEY,
+    VAPID_PRIVATE_KEY
+  );
 }
 
 function createEmptyDb() {
@@ -30,7 +45,8 @@ function createEmptyDb() {
     counters: { users: 0, chats: 0, messages: 0 },
     users: [],
     chats: [],
-    messages: []
+    messages: [],
+    push_subscriptions: []
   };
 }
 
@@ -48,7 +64,8 @@ function readDb() {
       counters: data.counters || { users: 0, chats: 0, messages: 0 },
       users: Array.isArray(data.users) ? data.users : [],
       chats: Array.isArray(data.chats) ? data.chats : [],
-      messages: Array.isArray(data.messages) ? data.messages : []
+      messages: Array.isArray(data.messages) ? data.messages : [],
+      push_subscriptions: Array.isArray(data.push_subscriptions) ? data.push_subscriptions : []
     };
   } catch (error) {
     console.error('Failed to read DB, backing up broken file.', error);
@@ -76,9 +93,7 @@ function nextId(kind) {
 function nowIso() {
   return new Date().toISOString();
 }
-app.get('/health', (_req, res) => {
-  res.send('ok');
-});
+
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -88,7 +103,7 @@ app.use(express.static(PUBLIC_DIR));
 const storageFor = (dir) => multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, dir),
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname || '').toLowerCase() || '.png';
+    const ext = path.extname(file.originalname || '').toLowerCase() || '.bin';
     cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
   }
 });
@@ -106,10 +121,36 @@ const uploadAvatar = multer({
   fileFilter: imageFileFilter
 });
 
+const chatUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) {
+        return cb(null, IMAGES_DIR);
+      }
+
+      if (file.mimetype.startsWith('audio/')) {
+        return cb(null, VOICE_DIR);
+      }
+
+      cb(new Error('Unsupported file type'));
+    },
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname || '').toLowerCase() || '.bin';
+      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+    }
+  }),
+  limits: { fileSize: 15 * 1024 * 1024 }
+});
+
 const uploadImage = multer({
   storage: storageFor(IMAGES_DIR),
   limits: { fileSize: 8 * 1024 * 1024 },
   fileFilter: imageFileFilter
+});
+
+const uploadVoice = multer({
+  storage: storageFor(VOICE_DIR),
+  limits: { fileSize: 15 * 1024 * 1024 }
 });
 
 function signToken(user) {
@@ -144,6 +185,7 @@ function publicUser(user) {
     created_at: user.created_at
   };
 }
+
 function getUserById(userId) {
   return publicUser(db.users.find((u) => u.id === Number(userId)) || null);
 }
@@ -259,6 +301,39 @@ function broadcastPresence() {
   }
 }
 
+async function sendPushToUser(userId, payload) {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
+  if (!Array.isArray(db.push_subscriptions)) return;
+
+  const subscriptions = db.push_subscriptions.filter((item) => item.user_id === userId);
+  let changed = false;
+
+  for (const item of subscriptions) {
+    try {
+      await webPush.sendNotification(item.subscription, JSON.stringify(payload));
+    } catch (error) {
+      console.error('Push send failed', error?.statusCode || '', error?.body || error);
+
+      if (error.statusCode === 404 || error.statusCode === 410) {
+        db.push_subscriptions = db.push_subscriptions.filter(
+          (sub) => sub.subscription?.endpoint !== item.subscription?.endpoint
+        );
+        changed = true;
+      }
+    }
+  }
+
+  if (changed) saveDb();
+}
+
+app.get('/health', (_req, res) => {
+  res.send('ok');
+});
+
+app.get('/api/push/public-key', (_req, res) => {
+  res.json({ publicKey: VAPID_PUBLIC_KEY || '' });
+});
+
 app.post('/api/register', uploadAvatar.single('avatar'), async (req, res) => {
   try {
     const username = String(req.body.username || '').trim();
@@ -278,13 +353,13 @@ app.post('/api/register', uploadAvatar.single('avatar'), async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
     const user = {
-     id: nextId('users'),
-     username,
-     display_name: username,
-     bio: '',
-     password_hash: passwordHash,
-     avatar_url: req.file ? `/uploads/avatars/${req.file.filename}` : null,
-     created_at: nowIso()
+      id: nextId('users'),
+      username,
+      display_name: username,
+      bio: '',
+      password_hash: passwordHash,
+      avatar_url: req.file ? `/uploads/avatars/${req.file.filename}` : null,
+      created_at: nowIso()
     };
 
     db.users.push(user);
@@ -335,17 +410,6 @@ app.get('/api/me', authMiddleware, (req, res) => {
   res.json({ user: req.user });
 });
 
-app.get('/api/users/:id', authMiddleware, (req, res) => {
-  const userId = Number(req.params.id);
-  const user = getUserById(userId);
-
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-
-  res.json({ user });
-});
-
 app.patch('/api/profile', authMiddleware, (req, res) => {
   try {
     const displayName = String(req.body.display_name || '').trim();
@@ -376,6 +440,27 @@ app.patch('/api/profile', authMiddleware, (req, res) => {
   }
 });
 
+app.post('/api/profile/avatar', authMiddleware, uploadAvatar.single('avatar'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Файл не загружен' });
+    }
+
+    const userIndex = db.users.findIndex((u) => u.id === req.user.id);
+    if (userIndex === -1) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    db.users[userIndex].avatar_url = `/uploads/avatars/${req.file.filename}`;
+    saveDb();
+
+    res.json({ user: publicUser(db.users[userIndex]) });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Не удалось обновить аватар' });
+  }
+});
+
 app.get('/api/users', authMiddleware, (req, res) => {
   const onlineSet = new Set(activeConnections.keys());
   const users = db.users
@@ -384,6 +469,47 @@ app.get('/api/users', authMiddleware, (req, res) => {
     .map((user) => ({ ...publicUser(user), is_online: onlineSet.has(user.id) }));
 
   res.json({ users });
+});
+
+app.get('/api/users/:id', authMiddleware, (req, res) => {
+  const userId = Number(req.params.id);
+  const user = getUserById(userId);
+
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  res.json({ user });
+});
+
+app.post('/api/push/subscribe', authMiddleware, (req, res) => {
+  try {
+    const subscription = req.body.subscription;
+
+    if (!subscription || !subscription.endpoint) {
+      return res.status(400).json({ error: 'Invalid subscription' });
+    }
+
+    db.push_subscriptions = db.push_subscriptions.filter(
+      (item) => !(
+        item.user_id === req.user.id &&
+        item.subscription &&
+        item.subscription.endpoint === subscription.endpoint
+      )
+    );
+
+    db.push_subscriptions.push({
+      user_id: req.user.id,
+      subscription,
+      created_at: nowIso()
+    });
+
+    saveDb();
+    res.json({ ok: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to save push subscription' });
+  }
 });
 
 app.get('/api/chats', authMiddleware, (req, res) => {
@@ -414,27 +540,6 @@ app.get('/api/chats', authMiddleware, (req, res) => {
     .map(({ sort_time, ...chat }) => chat);
 
   res.json({ chats });
-});
-
-app.post('/api/profile/avatar', authMiddleware, uploadAvatar.single('avatar'), (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'Файл не загружен' });
-    }
-
-    const userIndex = db.users.findIndex((u) => u.id === req.user.id);
-    if (userIndex === -1) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    db.users[userIndex].avatar_url = `/uploads/avatars/${req.file.filename}`;
-    saveDb();
-
-    res.json({ user: publicUser(db.users[userIndex]) });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Не удалось обновить аватар' });
-  }
 });
 
 app.post('/api/chats', authMiddleware, (req, res) => {
@@ -470,55 +575,98 @@ app.get('/api/chats/:chatId/messages', authMiddleware, (req, res) => {
   res.json({ messages });
 });
 
-app.post('/api/chats/:chatId/messages', authMiddleware, uploadImage.single('image'), (req, res) => {
-  const chatId = Number(req.params.chatId);
-  const chat = getChatForUser(chatId, req.user.id);
-  if (!chat) {
-    return res.status(404).json({ error: 'Chat not found' });
+app.post(
+  '/api/chats/:chatId/messages',
+  authMiddleware,
+  chatUpload.fields([
+    { name: 'image', maxCount: 1 },
+    { name: 'voice', maxCount: 1 }
+  ]),
+  async (req, res) => {
+    const chatId = Number(req.params.chatId);
+    const chat = getChatForUser(chatId, req.user.id);
+
+    if (!chat) {
+      return res.status(404).json({ error: 'Chat not found' });
+    }
+
+    const text = String(req.body.text || '').trim();
+    const imageFile = req.files?.image?.[0] || null;
+    const voiceFile = req.files?.voice?.[0] || null;
+
+    const hasImage = Boolean(imageFile);
+    const hasVoice = Boolean(voiceFile);
+
+    if (!text && !hasImage && !hasVoice) {
+      return res.status(400).json({ error: 'Message is empty' });
+    }
+
+    const created = [];
+
+    if (text) {
+      created.push({
+        id: nextId('messages'),
+        chat_id: chatId,
+        sender_id: req.user.id,
+        type: 'text',
+        content: text,
+        created_at: nowIso()
+      });
+    }
+
+    if (hasImage) {
+      created.push({
+        id: nextId('messages'),
+        chat_id: chatId,
+        sender_id: req.user.id,
+        type: 'image',
+        content: `/uploads/images/${imageFile.filename}`,
+        created_at: nowIso()
+      });
+    }
+
+    if (hasVoice) {
+      created.push({
+        id: nextId('messages'),
+        chat_id: chatId,
+        sender_id: req.user.id,
+        type: 'voice',
+        content: `/uploads/voice/${voiceFile.filename}`,
+        created_at: nowIso()
+      });
+    }
+
+    db.messages.push(...created);
+    saveDb();
+
+    const partner = getPartnerFromChat(chat, req.user.id);
+    const serialized = created.map(serializeMessage);
+
+    for (const message of serialized) {
+      sendToUser(req.user.id, { type: 'new_message', message });
+      if (partner) sendToUser(partner.id, { type: 'new_message', message });
+    }
+
+    if (partner) {
+      const previewText = text
+        ? text
+        : hasImage
+          ? '📷 Фото'
+          : hasVoice
+            ? '🎤 Голосовое сообщение'
+            : 'Новое сообщение';
+
+      await sendPushToUser(partner.id, {
+        title: req.user.display_name || req.user.username,
+        body: previewText,
+        url: `/?chat=${chatId}`,
+        chatId
+      });
+    }
+
+    res.json({ messages: serialized });
   }
-
-  const text = String(req.body.text || '').trim();
-  const hasImage = Boolean(req.file);
-  if (!text && !hasImage) {
-    return res.status(400).json({ error: 'Message is empty' });
-  }
-
-  const created = [];
-  if (text) {
-    created.push({
-      id: nextId('messages'),
-      chat_id: chatId,
-      sender_id: req.user.id,
-      type: 'text',
-      content: text,
-      created_at: nowIso()
-    });
-  }
-
-  if (hasImage) {
-    created.push({
-      id: nextId('messages'),
-      chat_id: chatId,
-      sender_id: req.user.id,
-      type: 'image',
-      content: `/uploads/images/${req.file.filename}`,
-      created_at: nowIso()
-    });
-  }
-
-  db.messages.push(...created);
-  saveDb();
-
-  const partner = getPartnerFromChat(chat, req.user.id);
-  const serialized = created.map(serializeMessage);
-
-  for (const message of serialized) {
-    sendToUser(req.user.id, { type: 'new_message', message });
-    if (partner) sendToUser(partner.id, { type: 'new_message', message });
-  }
-
-  res.json({ messages: serialized });
-});
+);
 
 app.get('*', (_req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, 'index.html'));

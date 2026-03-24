@@ -135,7 +135,6 @@ button {
 
 .tab,
 .auth-form button,
-.composer button,
 .ghost-btn {
   border: none;
   border-radius: 14px;
@@ -205,16 +204,14 @@ button {
   box-shadow: 0 0 0 4px rgba(124, 156, 255, 0.12);
 }
 
-.auth-form button,
-.composer button {
+.auth-form button {
   background: linear-gradient(180deg, #85a6ff 0%, #5d84ff 100%);
   color: white;
   font-weight: 800;
   box-shadow: 0 14px 30px rgba(93, 132, 255, 0.3);
 }
 
-.auth-form button:hover,
-.composer button:hover {
+.auth-form button:hover {
   box-shadow: 0 18px 38px rgba(93, 132, 255, 0.35);
 }
 
@@ -267,8 +264,6 @@ button {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
-
-
 .section-title {
   margin: 16px 0 10px;
   color: var(--muted-2);
@@ -297,12 +292,38 @@ button {
     background-color 0.18s ease,
     transform 0.18s ease,
     box-shadow 0.18s ease;
+  min-width: 0;
 }
 
 .list-item:hover,
 .list-item.active {
   background: rgba(124, 156, 255, 0.18);
   border-color: rgba(124, 156, 255, 0.4);
+}
+
+.list-item-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.list-item-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.list-item-text .strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.preview-text {
+  min-width: 0;
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
 }
 
 .presence {
@@ -357,9 +378,33 @@ button {
 
 .chat-header {
   padding: 18px 22px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(15, 21, 36, 0.84);
   backdrop-filter: blur(20px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chat-head-user {
+  min-width: 0;
+  flex: 1;
+}
+
+.chat-head-meta {
+  min-width: 0;
+}
+
+.chat-head-meta .strong,
+#chat-title,
+#chat-status {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#chat-status {
+  font-size: 13px;
 }
 
 .messages {
@@ -395,27 +440,28 @@ button {
   max-width: min(72%, 620px);
   padding: 12px 14px;
   border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.035));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.035));
   border: 1px solid var(--border);
   box-shadow: var(--shadow-md);
   word-break: break-word;
+  overflow: hidden;
 }
 
 .message.mine {
   align-self: flex-end;
   background: linear-gradient(180deg, rgba(124, 156, 255, 0.2), rgba(93, 132, 255, 0.14));
   border-color: rgba(124, 156, 255, 0.26);
-  border-bottom-right-radius: 6px;
-}
-
-.message:not(.mine) {
-  border-bottom-left-radius: 6px;
 }
 
 .message-meta {
   font-size: 12px;
   color: var(--muted);
   margin-bottom: 6px;
+}
+
+.message-text {
+  white-space: pre-wrap;
+  line-height: 1.45;
 }
 
 .message p {
@@ -430,30 +476,50 @@ button {
   margin-top: 8px;
 }
 
+.message audio,
+.voice-player {
+  width: 260px;
+  max-width: 100%;
+  display: block;
+  margin-top: 6px;
+}
+
+.message.mine audio,
+.message.mine .voice-player {
+  margin-left: auto;
+}
+
 .composer {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 12px;
+  grid-template-columns: 48px 48px 1fr auto;
+  gap: 10px;
   align-items: center;
-  padding: 18px 22px;
+  padding: 14px 16px;
   border-top: 1px solid var(--border);
   background: rgba(15, 21, 36, 0.88);
   backdrop-filter: blur(14px);
-  
 }
 
+.icon-btn,
 .file-label {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
   border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.045);
   color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
 }
 
+.icon-btn:hover,
 .file-label:hover {
   border-color: rgba(124, 156, 255, 0.28);
   background: rgba(124, 156, 255, 0.08);
@@ -464,9 +530,42 @@ button {
 }
 
 #message-input {
-  min-height: 52px;
-  border-radius: 18px;
-  padding-inline: 16px;
+  width: 100%;
+  height: 48px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  border-radius: 14px;
+  padding: 0 16px;
+  outline: none;
+}
+
+#message-input::placeholder {
+  color: var(--muted-2);
+}
+
+#message-input:focus {
+  border-color: rgba(124, 156, 255, 0.48);
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: 0 0 0 4px rgba(124, 156, 255, 0.12);
+}
+
+.send-btn {
+  height: 48px;
+  min-width: 116px;
+  border: none;
+  border-radius: 14px;
+  padding: 0 18px;
+  background: linear-gradient(180deg, #85a6ff 0%, #5d84ff 100%);
+  color: #fff;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 12px 24px rgba(93, 132, 255, 0.28);
+}
+
+.send-btn:hover {
+  box-shadow: 0 16px 30px rgba(93, 132, 255, 0.34);
 }
 
 #selected-file,
@@ -475,11 +574,12 @@ button {
   color: var(--muted);
 }
 
-.preview-text {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 220px;
+#selected-file,
+#voice-status {
+  padding: 0 16px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .collapsible {
@@ -499,10 +599,7 @@ button {
   transform: rotate(90deg);
 }
 
-#users-list.collapsed {
-  display: none;
-}
-
+#users-list.collapsed,
 #chats-list.collapsed {
   display: none;
 }
@@ -656,7 +753,7 @@ button {
   visibility: visible !important;
   object-fit: cover !important;
   border-radius: 50% !important;
-  background: red !important;
+  background: #202a40 !important;
 }
 
 .profile-readonly {
@@ -676,33 +773,22 @@ button {
 .avatar-upload-btn input {
   display: none;
 }
-/* ===== Telegram-like mobile layout ===== */
 
-.chat-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.push-btn {
+  width: 100%;
+  margin: 0 0 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  border-radius: 16px;
+  padding: 12px 14px;
+  font-weight: 700;
+  text-align: center;
 }
 
-.chat-head-user {
-  min-width: 0;
-  flex: 1;
-}
-
-.chat-head-meta {
-  min-width: 0;
-}
-
-.chat-head-meta .strong,
-#chat-title,
-#chat-status {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-#chat-status {
-  font-size: 13px;
+.push-btn:hover {
+  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .mobile-back-btn {
@@ -858,9 +944,21 @@ button {
     margin-bottom: 4px;
   }
 
+  .message-text {
+    display: block;
+    white-space: pre-wrap;
+    line-height: 1.45;
+  }
+
+  .message audio,
+  .voice-player {
+    width: 220px;
+    max-width: 100%;
+  }
+
   .composer {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: 42px 42px 1fr 96px;
     align-items: center;
     gap: 8px;
     padding: 12px 14px;
@@ -871,25 +969,33 @@ button {
     padding-bottom: calc(12px + env(safe-area-inset-bottom));
   }
 
+  .icon-btn,
   .file-label {
-    width: 44px;
-    height: 44px;
-    border-radius: 14px;
-    flex-shrink: 0;
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    min-height: 42px;
+    border-radius: 12px;
+    font-size: 16px;
+    padding: 0;
   }
 
   #message-input {
     min-width: 0;
-    min-height: 44px;
-    height: 44px;
+    width: 100%;
+    height: 42px;
+    min-height: 42px;
     padding: 0 14px;
+    border-radius: 12px;
   }
 
-  .composer button {
-    min-width: 44px;
-    height: 44px;
-    padding: 0 16px;
-    border-radius: 14px;
+  .send-btn {
+    width: 96px;
+    min-width: 96px;
+    height: 42px;
+    padding: 0 12px;
+    border-radius: 12px;
+    font-size: 14px;
   }
 
   #selected-file,
@@ -901,37 +1007,14 @@ button {
   .empty-state {
     padding: 24px 16px;
   }
-}
-.list-item {
-  min-width: 0;
-}
 
-.list-item-main {
-  min-width: 0;
-  flex: 1;
-}
+  .push-btn {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    font-size: 14px;
+  }
 
-.list-item-text {
-  min-width: 0;
-  flex: 1;
-}
-
-.list-item-text .strong {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.preview-text {
-  min-width: 0;
-  max-width: 140px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: left;
-}
-
-@media (max-width: 900px) {
   .preview-text {
     max-width: 110px;
   }

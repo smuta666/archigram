@@ -7,13 +7,17 @@ const state = {
   onlineUserIds: new Set(),
   ws: null,
   typingTimer: null,
-  typingVisibleTimer: null
+  typingVisibleTimer: null,
+  swRegistration: null,
+  pushPermission: 'default',
+  mediaRecorder: null,
+  voiceChunks: [],
+  voiceBlob: null,
+  isRecording: false
 };
 
 const authScreen = document.getElementById('auth-screen');
 const chatScreen = document.getElementById('chat-screen');
-const sidebar = document.querySelector('.sidebar');
-const chatPanel = document.querySelector('.chat-panel');
 const mobileBackBtn = document.getElementById('mobile-back-btn');
 const authError = document.getElementById('auth-error');
 const loginForm = document.getElementById('login-form');
@@ -37,6 +41,10 @@ const messageInput = document.getElementById('message-input');
 const imageInput = document.getElementById('image-input');
 const selectedFile = document.getElementById('selected-file');
 const typingIndicator = document.getElementById('typing-indicator');
+const recordVoiceBtn = document.getElementById('record-voice-btn');
+const stopVoiceBtn = document.getElementById('stop-voice-btn');
+const voiceStatus = document.getElementById('voice-status');
+
 const openProfileBtn = document.getElementById('open-profile-btn');
 const profileModal = document.getElementById('profile-modal');
 const profileBackdrop = document.getElementById('profile-backdrop');
@@ -48,7 +56,10 @@ const profileAvatarPreview = document.getElementById('profile-avatar-preview');
 const profileAvatarInput = document.getElementById('profile-avatar-input');
 const profileUsernameRow = document.getElementById('profile-username-row');
 const profileCreatedAt = document.getElementById('profile-created-at');
+const profileSaveBtn = document.getElementById('profile-save-btn');
+const profileAvatarUploadLabel = document.getElementById('profile-avatar-upload-label');
 
+const enablePushBtn = document.getElementById('enable-push-btn');
 
 function avatarOrFallback(url) {
   return url || 'data:image/svg+xml;utf8,' + encodeURIComponent(`
@@ -108,6 +119,13 @@ function scrollMessagesToBottom(force = false) {
   });
 }
 
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+}
+
 async function api(url, options = {}) {
   const response = await fetch(url, {
     credentials: 'include',
@@ -120,10 +138,142 @@ async function api(url, options = {}) {
     : await response.text();
 
   if (!response.ok) {
-    throw new Error(data.error || 'Request failed');
+    console.log('API ERROR', response.status, data);
+    throw new Error(
+      (data && data.error) ||
+      (typeof data === 'string' ? data : '') ||
+      `HTTP ${response.status}`
+    );
   }
 
   return data;
+}
+
+async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return null;
+
+  try {
+    const registration = await navigator.serviceWorker.register('/sw.js');
+    state.swRegistration = registration;
+    return registration;
+  } catch (error) {
+    console.error('SW registration failed', error);
+    return null;
+  }
+}
+
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return 'denied';
+  const permission = await Notification.requestPermission();
+  state.pushPermission = permission;
+  return permission;
+}
+
+async function getPushPublicKey() {
+  const data = await api('/api/push/public-key');
+  return data.publicKey || '';
+}
+
+async function subscribeToPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (!state.me) return;
+
+  const registration = state.swRegistration || await navigator.serviceWorker.ready;
+  if (!registration) return;
+
+  const permission = await requestNotificationPermission();
+  if (permission !== 'granted') return;
+
+  const vapidPublicKey = await getPushPublicKey();
+  if (!vapidPublicKey) {
+    console.warn('No VAPID public key configured');
+    return;
+  }
+
+  let subscription = await registration.pushManager.getSubscription();
+
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+    });
+  }
+
+  await api('/api/push/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subscription })
+  });
+}
+
+function getChatIdFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return Number(params.get('chat')) || null;
+}
+
+async function startVoiceRecording() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    alert('Запись голоса не поддерживается на этом устройстве');
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    state.voiceChunks = [];
+    state.voiceBlob = null;
+
+    const mediaRecorder = new MediaRecorder(stream);
+    state.mediaRecorder = mediaRecorder;
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        state.voiceChunks.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = () => {
+      state.voiceBlob = new Blob(state.voiceChunks, {
+        type: mediaRecorder.mimeType || 'audio/webm'
+      });
+
+      stream.getTracks().forEach(track => track.stop());
+
+      voiceStatus.textContent = 'Голосовое записано, нажми "Отправить"';
+      voiceStatus.classList.remove('hidden');
+      state.isRecording = false;
+      recordVoiceBtn.classList.remove('hidden');
+      stopVoiceBtn.classList.add('hidden');
+    };
+
+    mediaRecorder.start();
+    state.isRecording = true;
+
+    voiceStatus.textContent = 'Идёт запись...';
+    voiceStatus.classList.remove('hidden');
+    recordVoiceBtn.classList.add('hidden');
+    stopVoiceBtn.classList.remove('hidden');
+  } catch (error) {
+    console.error('Voice record error', error);
+    alert('Не удалось получить доступ к микрофону');
+  }
+}
+
+function stopVoiceRecording() {
+  if (state.mediaRecorder && state.isRecording) {
+    state.mediaRecorder.stop();
+  }
+}
+
+function resetVoiceRecording() {
+  state.mediaRecorder = null;
+  state.voiceChunks = [];
+  state.voiceBlob = null;
+  state.isRecording = false;
+  voiceStatus.textContent = '';
+  voiceStatus.classList.add('hidden');
+  recordVoiceBtn.classList.remove('hidden');
+  stopVoiceBtn.classList.add('hidden');
 }
 
 function switchTab(name) {
@@ -194,10 +344,29 @@ profileBackdrop?.addEventListener('click', () => {
   closeProfileModal();
 });
 
-
-
 mobileBackBtn?.addEventListener('click', () => {
   closeChatOnMobile();
+});
+
+enablePushBtn?.addEventListener('click', async () => {
+  try {
+    await registerServiceWorker();
+    await subscribeToPush();
+    enablePushBtn.textContent = 'Уведомления включены';
+    enablePushBtn.disabled = true;
+    alert('Уведомления включены');
+  } catch (error) {
+    console.error('Push enable failed', error);
+    alert(error.message || 'Не удалось включить уведомления');
+  }
+});
+
+recordVoiceBtn?.addEventListener('click', async () => {
+  await startVoiceRecording();
+});
+
+stopVoiceBtn?.addEventListener('click', () => {
+  stopVoiceRecording();
 });
 
 window.addEventListener('resize', () => {
@@ -263,26 +432,19 @@ function setScreen(isAuthenticated) {
   }
 }
 
+function displayNameOf(user) {
+  return user?.display_name || user?.username || '';
+}
+
 function renderMe() {
   meName.textContent = displayNameOf(state.me);
   meAvatar.src = avatarOrFallback(state.me.avatar_url);
 }
 
-function displayNameOf(user) {
-  return user.display_name || user.username;
-}
-
-function openProfileModal() {
-  if (!state.me) return;
-  openUserProfileModal(state.me);
-}
-
-function closeProfileModal() {
-  profileModal.classList.add('hidden');
-}
-
 function openUserProfileModal(user) {
   if (!user) return;
+
+  const isMe = state.me && user.id === state.me.id;
 
   profileDisplayName.value = user.display_name || user.username || '';
   profileBio.value = user.bio || '';
@@ -296,22 +458,23 @@ function openUserProfileModal(user) {
     : '';
   profileCreatedAt.classList.remove('hidden');
 
-  const isMe = state.me && user.id === state.me.id;
-
   profileDisplayName.disabled = !isMe;
   profileBio.disabled = !isMe;
 
-  if (profileAvatarInput) {
-    profileAvatarInput.disabled = !isMe;
-    profileAvatarInput.parentElement?.classList.toggle('hidden', !isMe);
-  }
-
-  if (profileForm) {
-    const submitBtn = profileForm.querySelector('button[type="submit"]');
-    if (submitBtn) submitBtn.classList.toggle('hidden', !isMe);
-  }
+  if (profileSaveBtn) profileSaveBtn.classList.toggle('hidden', !isMe);
+  if (profileAvatarUploadLabel) profileAvatarUploadLabel.classList.toggle('hidden', !isMe);
+  if (profileAvatarInput) profileAvatarInput.disabled = !isMe;
 
   profileModal.classList.remove('hidden');
+}
+
+function openProfileModal() {
+  if (!state.me) return;
+  openUserProfileModal(state.me);
+}
+
+function closeProfileModal() {
+  profileModal.classList.add('hidden');
 }
 
 async function openOtherUserProfile(userId) {
@@ -343,6 +506,7 @@ function createListItem(user, rightNode, isOnline = false) {
   if (rightNode) div.appendChild(rightNode);
   return div;
 }
+
 function renderUsers() {
   usersList.innerHTML = '';
 
@@ -353,16 +517,6 @@ function renderUsers() {
   }
 }
 
-usersList?.addEventListener('click', (e) => {
-  const item = e.target.closest('.list-item');
-  if (!item || !usersList.contains(item)) return;
-
-  const userId = Number(item.dataset.userId);
-  if (!userId) return;
-
-  openOrCreateChat(userId);
-});
-
 function renderChats() {
   chatsList.innerHTML = '';
 
@@ -370,16 +524,29 @@ function renderChats() {
     const right = document.createElement('div');
     right.className = 'preview-text muted small';
     right.title = chat.last_message
-     ? (chat.last_message.type === 'image' ? '📷 Картинка' : chat.last_message.content)
-     : 'Пустой чат';
+      ? (
+          chat.last_message.type === 'image'
+            ? '📷 Картинка'
+            : chat.last_message.type === 'voice'
+              ? '🎤 Голосовое сообщение'
+              : chat.last_message.content
+        )
+      : 'Пустой чат';
+
     right.textContent = chat.last_message
-     ? (chat.last_message.type === 'image' ? '📷 Картинка' : chat.last_message.content)
-     : 'Пустой чат';
+      ? (
+          chat.last_message.type === 'image'
+            ? '📷 Картинка'
+            : chat.last_message.type === 'voice'
+              ? '🎤 Голосовое сообщение'
+              : chat.last_message.content
+        )
+      : 'Пустой чат';
 
     const item = createListItem(
-     chat.partner,
-     right,
-     state.onlineUserIds.has(chat.partner.id)
+      chat.partner,
+      right,
+      state.onlineUserIds.has(chat.partner.id)
     );
 
     item.dataset.chatId = String(chat.id);
@@ -387,16 +554,6 @@ function renderChats() {
     chatsList.appendChild(item);
   }
 }
-
-chatsList?.addEventListener('click', (e) => {
-  const item = e.target.closest('.list-item');
-  if (!item || !chatsList.contains(item)) return;
-
-  const chatId = Number(item.dataset.chatId);
-  if (!chatId) return;
-
-  openChat(chatId);
-});
 
 function renderMessages() {
   messagesEl.innerHTML = '';
@@ -412,6 +569,7 @@ function renderMessages() {
 
     if (message.type === 'text') {
       const text = document.createElement('div');
+      text.className = 'message-text';
       text.textContent = message.content;
       div.appendChild(text);
     } else if (message.type === 'image') {
@@ -420,6 +578,13 @@ function renderMessages() {
       img.alt = 'image';
       img.addEventListener('load', () => scrollMessagesToBottom(true));
       div.appendChild(img);
+    } else if (message.type === 'voice') {
+      const audio = document.createElement('audio');
+      audio.src = message.content;
+      audio.controls = true;
+      audio.preload = 'metadata';
+      audio.className = 'voice-player';
+      div.appendChild(audio);
     }
 
     messagesEl.appendChild(div);
@@ -435,11 +600,13 @@ function setCurrentChat(chat) {
   typingIndicator.classList.add('hidden');
   chatTitle.textContent = displayNameOf(chat.partner);
   chatAvatar.src = avatarOrFallback(chat.partner.avatar_url);
+  chatStatus.textContent = state.onlineUserIds.has(chat.partner.id) ? 'В сети' : 'Не в сети';
+
   chatAvatar.style.cursor = 'pointer';
   chatTitle.style.cursor = 'pointer';
   chatAvatar.onclick = () => openOtherUserProfile(chat.partner.id);
   chatTitle.onclick = () => openOtherUserProfile(chat.partner.id);
-  chatStatus.textContent = state.onlineUserIds.has(chat.partner.id) ? 'В сети' : 'Не в сети';
+
   renderChats();
   scrollMessagesToBottom(true);
 }
@@ -570,6 +737,37 @@ function connectWebSocket() {
   });
 }
 
+usersList?.addEventListener('click', (e) => {
+  const item = e.target.closest('.list-item');
+  if (!item || !usersList.contains(item)) return;
+
+  const userId = Number(item.dataset.userId);
+  if (!userId) return;
+
+  openOrCreateChat(userId);
+});
+
+usersList?.addEventListener('contextmenu', (e) => {
+  const item = e.target.closest('.list-item');
+  if (!item || !usersList.contains(item)) return;
+
+  e.preventDefault();
+  const userId = Number(item.dataset.userId);
+  if (!userId) return;
+
+  openOtherUserProfile(userId);
+});
+
+chatsList?.addEventListener('click', (e) => {
+  const item = e.target.closest('.list-item');
+  if (!item || !chatsList.contains(item)) return;
+
+  const chatId = Number(item.dataset.chatId);
+  if (!chatId) return;
+
+  openChat(chatId);
+});
+
 messageInput.addEventListener('input', () => {
   if (!state.ws || state.ws.readyState !== WebSocket.OPEN || !state.currentChat) return;
 
@@ -590,11 +788,23 @@ messageForm.addEventListener('submit', async (e) => {
 
   const text = messageInput.value.trim();
   const image = imageInput.files[0];
-  if (!text && !image) return;
+  const voice = state.voiceBlob;
+
+  if (!text && !image && !voice) return;
 
   const formData = new FormData();
   if (text) formData.append('text', text);
   if (image) formData.append('image', image);
+
+  if (voice) {
+    const ext = voice.type.includes('ogg')
+      ? 'ogg'
+      : voice.type.includes('mp4')
+        ? 'mp4'
+        : 'webm';
+
+    formData.append('voice', voice, `voice-message.${ext}`);
+  }
 
   try {
     await api(`/api/chats/${state.currentChat.id}/messages`, {
@@ -605,6 +815,7 @@ messageForm.addEventListener('submit', async (e) => {
     messageInput.value = '';
     imageInput.value = '';
     selectedFile.textContent = '';
+    resetVoiceRecording();
 
     scrollMessagesToBottom(true);
   } catch (error) {
@@ -674,6 +885,7 @@ profileAvatarInput?.addEventListener('change', async (e) => {
     alert(error.message);
   }
 });
+
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
@@ -684,11 +896,25 @@ async function bootstrapAfterAuth(user) {
   state.me = user;
   renderMe();
   setScreen(true);
+
   await refreshSidebarData();
+
+  const chatIdFromUrl = getChatIdFromUrl();
+  if (chatIdFromUrl) {
+    const existing = state.chats.find((c) => c.id === chatIdFromUrl);
+    if (existing) {
+      await openChat(existing.id);
+    }
+  }
+
+  await registerServiceWorker();
+
   connectWebSocket();
 }
 
 async function init() {
+  await registerServiceWorker();
+
   try {
     const data = await api('/api/me');
     await bootstrapAfterAuth(data.user);

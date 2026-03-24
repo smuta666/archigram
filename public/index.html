@@ -6,6 +6,9 @@
   <title>ArchiGram</title>
   <link rel="icon" href="/favicon.png" />
   <link rel="stylesheet" href="/styles.css" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0b0f19" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -61,20 +64,25 @@
             <img id="me-avatar" class="avatar" alt="my avatar" />
             <div>
               <div id="me-name" class="strong"></div>
-              <div class="muted">Редактировать</div>
+              <div class="muted">Ты в сети</div>
             </div>
           </button>
-          <button id="logout-btn" class="ghost-btn">Выйти</button>
+
+          <button id="logout-btn" class="ghost-btn" type="button">Выйти</button>
         </div>
 
+        <button id="enable-push-btn" class="push-btn" type="button">
+          Включить уведомления
+        </button>
+
         <div class="section-title collapsible" id="users-toggle">
-         <span class="arrow">‣</span> Люди
-	</div>
+          <span class="arrow">‣</span> Люди
+        </div>
         <div id="users-list" class="list"></div>
 
         <div class="section-title collapsible" id="chats-toggle">
-  	 <span class="arrow">‣</span> Мои чаты
-	</div>
+          <span class="arrow">‣</span> Мои чаты
+        </div>
         <div id="chats-list" class="list"></div>
       </aside>
 
@@ -101,21 +109,36 @@
           <div id="typing-indicator" class="typing muted hidden">Собеседник печатает…</div>
 
           <form id="message-form" class="composer" enctype="multipart/form-data">
-            <label class="file-label">
+            <label class="file-label icon-btn">
               <input id="image-input" type="file" accept="image/*" />
               <span>📎</span>
             </label>
 
-            <input id="message-input" type="text" placeholder="Напиши сообщение…" autocomplete="off" />
+            <button id="record-voice-btn" class="icon-btn" type="button" title="Записать голосовое">
+              🎤
+            </button>
 
-            <button type="submit">Отправить</button>
+            <button id="stop-voice-btn" class="icon-btn hidden" type="button" title="Остановить запись">
+              ⏹
+            </button>
+
+            <input
+              id="message-input"
+              type="text"
+              placeholder="Напиши сообщение..."
+              autocomplete="off"
+            />
+
+            <button id="send-btn" class="send-btn" type="submit">Отправить</button>
           </form>
 
           <div id="selected-file" class="muted small"></div>
+          <div id="voice-status" class="muted small hidden"></div>
         </div>
       </main>
     </section>
   </div>
+
   <div id="profile-modal" class="modal hidden">
     <div id="profile-backdrop" class="modal-backdrop"></div>
 
@@ -124,17 +147,18 @@
         <div class="strong">Профиль</div>
         <button id="close-profile-btn" class="ghost-btn" type="button">✕</button>
       </div>
+
       <div class="profile-avatar-block">
-  	<img id="profile-avatar-preview" class="profile-avatar" alt="profile avatar" />
-
-  	<input id="profile-avatar-input" type="file" accept="image/*" hidden />
-
-  	<label for="profile-avatar-input" class="avatar-upload-btn">
-    	 Изменить
-  	 </label>
+        <img id="profile-avatar-preview" class="profile-avatar" alt="profile avatar" />
+        <input id="profile-avatar-input" type="file" accept="image/*" hidden />
+        <label for="profile-avatar-input" id="profile-avatar-upload-label" class="avatar-upload-btn">
+          Изменить
+        </label>
       </div>
+
       <div id="profile-username-row" class="profile-readonly muted small hidden"></div>
       <div id="profile-created-at" class="profile-readonly muted small hidden"></div>
+
       <form id="profile-form" class="profile-form">
         <label>
           <span>Имя</span>
@@ -146,10 +170,11 @@
           <textarea id="profile-bio" maxlength="160" rows="4" placeholder="Пару слов о себе"></textarea>
         </label>
 
-        <button type="submit">Сохранить</button>
+        <button id="profile-save-btn" type="submit">Сохранить</button>
       </form>
     </div>
   </div>
+
   <script src="/app.js"></script>
 </body>
 </html>
