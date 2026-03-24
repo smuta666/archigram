@@ -609,7 +609,18 @@ function renderMessages() {
 
     const meta = document.createElement('div');
     meta.className = 'message-meta';
-    meta.textContent = `${message.sender_username} • ${formatTime(message.created_at)}`;
+
+    const metaText = document.createElement('span');
+    metaText.textContent = `${message.sender_username} • ${formatTime(message.created_at)}`;
+    meta.appendChild(metaText);
+
+    if (message.sender_id === state.me.id) {
+      const readMark = document.createElement('span');
+      readMark.className = `read-mark ${message.read_at ? 'read' : ''}`;
+      readMark.textContent = message.read_at ? '✓✓' : '✓';
+      meta.appendChild(readMark);
+    }
+
     div.appendChild(meta);
 
     if (message.type === 'text') {
@@ -759,6 +770,28 @@ async function loadMessages(chatId) {
   scrollMessagesToBottom(true);
 }
 
+async function markCurrentChatAsRead() {
+  if (!state.currentChat) return;
+
+  try {
+    const data = await api(`/api/chats/${state.currentChat.id}/read`, {
+      method: 'POST'
+    });
+
+    if (Array.isArray(data.messageIds) && data.messageIds.length) {
+      state.currentMessages = state.currentMessages.map(message =>
+        data.messageIds.includes(message.id)
+          ? { ...message, read_at: data.readAt }
+          : message
+      );
+
+      renderMessages();
+    }
+  } catch (error) {
+    console.error('markCurrentChatAsRead error:', error);
+  }
+}
+
 async function openChat(chatId) {
   const chat = state.chats.find(c => c.id === chatId);
   if (!chat) return;
@@ -768,6 +801,7 @@ async function openChat(chatId) {
 
   try {
     await loadMessages(chat.id);
+    await markCurrentChatAsRead();
   } catch (error) {
     console.error('loadMessages error:', error);
   }
@@ -860,6 +894,16 @@ function connectWebSocket() {
 
     if (data.type === 'new_message') {
       handleIncomingMessage(data.message);
+    }
+
+    if (data.type === 'messages_read') {
+      state.currentMessages = state.currentMessages.map(message =>
+        data.messageIds.includes(message.id)
+          ? { ...message, read_at: data.readAt }
+          : message
+      );
+
+      renderMessages();
     }
 
     if (data.type === 'typing' && state.currentChat?.id === data.chatId) {

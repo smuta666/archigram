@@ -81,6 +81,14 @@ function readDb() {
 
 let db = readDb();
 
+for (const message of db.messages) {
+  if (!('read_at' in message)) {
+    message.read_at = null;
+  }
+}
+
+saveDb();
+
 function saveDb() {
   fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), 'utf8');
 }
@@ -279,7 +287,8 @@ function serializeMessage(message) {
     sender_avatar_url: sender?.avatar_url || null,
     type: message.type,
     content: message.content,
-    created_at: message.created_at
+    created_at: message.created_at,
+    read_at: message.read_at || null
   };
 }
 
@@ -596,6 +605,54 @@ app.get('/api/chats/:chatId/messages', authMiddleware, (req, res) => {
   res.json({ messages });
 });
 
+app.post('/api/chats/:chatId/read', authMiddleware, (req, res) => {
+  try {
+    const chatId = Number(req.params.chatId);
+    const chat = getChatForUser(chatId, req.user.id);
+
+    if (!chat) {
+      return res.status(404).json({ error: 'Chat not found' });
+    }
+
+    const now = nowIso();
+    const updatedMessageIds = [];
+
+    for (const message of db.messages) {
+      if (
+        message.chat_id === chatId &&
+        message.sender_id !== req.user.id &&
+        !message.read_at
+      ) {
+        message.read_at = now;
+        updatedMessageIds.push(message.id);
+      }
+    }
+
+    saveDb();
+
+    const partner = getPartnerFromChat(chat, req.user.id);
+
+    if (partner && updatedMessageIds.length > 0) {
+      sendToUser(partner.id, {
+        type: 'messages_read',
+        chatId,
+        messageIds: updatedMessageIds,
+        readAt: now,
+        userId: req.user.id
+      });
+    }
+
+    res.json({
+      ok: true,
+      messageIds: updatedMessageIds,
+      readAt: now
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Не удалось отметить сообщения как прочитанные' });
+  }
+});
+
 app.post(
   '/api/chats/:chatId/messages',
   authMiddleware,
@@ -631,7 +688,8 @@ app.post(
         sender_id: req.user.id,
         type: 'text',
         content: text,
-        created_at: nowIso()
+        created_at: nowIso(),
+        read_at: null
       });
     }
 
@@ -642,7 +700,8 @@ app.post(
         sender_id: req.user.id,
         type: 'image',
         content: `/uploads/images/${imageFile.filename}`,
-        created_at: nowIso()
+        created_at: nowIso(),
+        read_at: null
       });
     }
 
@@ -653,7 +712,8 @@ app.post(
         sender_id: req.user.id,
         type: 'voice',
         content: `/uploads/voice/${voiceFile.filename}`,
-        created_at: nowIso()
+        created_at: nowIso(),
+        read_at: null
       });
     }
 
