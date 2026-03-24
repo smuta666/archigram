@@ -41,11 +41,11 @@ const messageInput = document.getElementById('message-input');
 const imageInput = document.getElementById('image-input');
 const selectedFile = document.getElementById('selected-file');
 const typingIndicator = document.getElementById('typing-indicator');
-const recordVoiceBtn = document.getElementById('record-voice-btn');
-const stopVoiceBtn = document.getElementById('stop-voice-btn');
-const voiceStatus = document.getElementById('voice-status');
-const voiceStatusText = document.getElementById('voice-status-text');
-const clearVoiceBtn = document.getElementById('clear-voice-btn');
+//const recordVoiceBtn = document.getElementById('record-voice-btn');
+//const stopVoiceBtn = document.getElementById('stop-voice-btn');
+//const voiceStatus = document.getElementById('voice-status');
+//const voiceStatusText = document.getElementById('voice-status-text');
+//const clearVoiceBtn = document.getElementById('clear-voice-btn');
 const openProfileBtn = document.getElementById('open-profile-btn');
 const profileModal = document.getElementById('profile-modal');
 const profileBackdrop = document.getElementById('profile-backdrop');
@@ -371,17 +371,17 @@ enablePushBtn?.addEventListener('click', async () => {
   }
 });
 
-recordVoiceBtn?.addEventListener('click', async () => {
-  await startVoiceRecording();
-});
+//recordVoiceBtn?.addEventListener('click', async () => {
+  //await startVoiceRecording();
+//});
 
-stopVoiceBtn?.addEventListener('click', () => {
-  stopVoiceRecording();
-});
+//stopVoiceBtn?.addEventListener('click', () => {
+  //stopVoiceRecording();
+//});
 
-clearVoiceBtn?.addEventListener('click', () => {
-  resetVoiceRecording();
-});
+//clearVoiceBtn?.addEventListener('click', () => {
+  //resetVoiceRecording();
+//});
 
 window.addEventListener('resize', () => {
   if (!isMobileLayout()) {
@@ -901,23 +901,23 @@ messageForm.addEventListener('submit', async (e) => {
 
   const text = messageInput.value.trim();
   const image = imageInput.files[0];
-  const voice = state.voiceBlob;
+  //const voice = state.voiceBlob;
 
-  if (!text && !image && !voice) return;
+  if (!text && !image) return;
 
   const formData = new FormData();
   if (text) formData.append('text', text);
   if (image) formData.append('image', image);
 
-  if (voice) {
-    const ext = voice.type.includes('ogg')
-      ? 'ogg'
-      : voice.type.includes('mp4')
-        ? 'mp4'
-        : 'webm';
-    console.log('voice type:', state.voiceMimeType, state.voiceBlob?.type);
-    formData.append('voice', voice, `voice-message.${ext}`);
-  }
+  //if (voice) {
+    //const ext = voice.type.includes('ogg')
+      //? 'ogg'
+      //: voice.type.includes('mp4')
+        //? 'mp4'
+        //: 'webm';
+    //console.log('voice type:', state.voiceMimeType, state.voiceBlob?.type);
+    //formData.append('voice', voice, `voice-message.${ext}`);
+  //}
 
   try {
     await api(`/api/chats/${state.currentChat.id}/messages`, {
@@ -928,7 +928,7 @@ messageForm.addEventListener('submit', async (e) => {
     messageInput.value = '';
     imageInput.value = '';
     selectedFile.textContent = '';
-    resetVoiceRecording();
+    //resetVoiceRecording();
 
     scrollMessagesToBottom(true);
   } catch (error) {
