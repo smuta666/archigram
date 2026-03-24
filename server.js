@@ -135,14 +135,10 @@ const chatUpload = multer({
       cb(new Error('Unsupported file field'));
     },
     filename: (_req, file, cb) => {
-      let ext = path.extname(file.originalname || '').toLowerCase();
+      const ext =
+        path.extname(file.originalname || '').toLowerCase() ||
+        (file.fieldname === 'voice' ? '.webm' : '.bin');
 
-      if (!ext) {
-        if (file.mimetype.includes('webm')) ext = '.webm';
-        else if (file.mimetype.includes('mp4')) ext = '.mp4';
-        else if (file.mimetype.includes('ogg')) ext = '.ogg';
-        else ext = '.bin'
-      }
       cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
     }
   }),
