@@ -853,21 +853,6 @@ button {
 }
 
 @media (max-width: 900px) {
-  .voice-status {
-    padding: 0 14px 10px;
-    gap: 10px;
-  }
-
-  .clear-voice-btn {
-    font-size: 11px;
-  }
-
-  .clear-voice-btn span {
-    display: none;
-  }
-}
-
-@media (max-width: 900px) {
   html,
   body {
     height: 100%;
@@ -1065,5 +1050,18 @@ button {
 
   .preview-text {
     max-width: 110px;
+  }
+
+  .voice-status {
+    padding: 0 14px 10px;
+    gap: 10px;
+  }
+
+  .clear-voice-btn {
+    font-size: 11px;
+  }
+
+  .clear-voice-btn span {
+    display: none;
   }
 }
