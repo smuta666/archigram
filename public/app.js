@@ -593,79 +593,12 @@ function renderMessages() {
       img.addEventListener('load', () => scrollMessagesToBottom(true));
       div.appendChild(img);
     } else if (message.type === 'voice') {
-      const voiceWrapper = document.createElement('div');
-      voiceWrapper.className = 'voice-message';
-
-      const playBtn = document.createElement('button');
-      playBtn.className = 'voice-play';
-      playBtn.type = 'button';
-      playBtn.textContent = '▶';
-
-      const progressContainer = document.createElement('div');
-      progressContainer.className = 'voice-progress';
-
-      const progressBar = document.createElement('div');
-      progressBar.className = 'voice-progress-bar';
-
-      progressContainer.appendChild(progressBar);
-
-      const timeLabel = document.createElement('div');
-      timeLabel.className = 'voice-time';
-      timeLabel.textContent = '0:00';
-
-      const audio = new Audio(message.content);
+      const audio = document.createElement('audio');
+      audio.src = message.content;
+      audio.controls = true;
       audio.preload = 'metadata';
-
-      function formatAudioTime(seconds) {
-        if (!Number.isFinite(seconds)) return '0:00';
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${String(secs).padStart(2, '0')}`;
-      }
-
-      playBtn.addEventListener('click', () => {
-        if (audio.paused) {
-          audio.play();
-          playBtn.textContent = '⏸';
-        } else {
-          audio.pause();
-          playBtn.textContent = '▶';
-        }
-      });
-
-      audio.addEventListener('loadedmetadata', () => {
-        timeLabel.textContent = formatAudioTime(audio.duration);
-      });
-
-      audio.addEventListener('timeupdate', () => {
-        if (audio.duration) {
-          const percent = (audio.currentTime / audio.duration) * 100;
-          progressBar.style.width = `${percent}%`;
-          timeLabel.textContent = formatAudioTime(audio.currentTime);
-        }
-      });
-
-      audio.addEventListener('ended', () => {
-        playBtn.textContent = '▶';
-        progressBar.style.width = '0%';
-        timeLabel.textContent = formatAudioTime(audio.duration);
-      });
-
-      audio.addEventListener('pause', () => {
-        if (!audio.ended) {
-          playBtn.textContent = '▶';
-        }
-      });
-
-      audio.addEventListener('play', () => {
-        playBtn.textContent = '⏸';
-      });
-
-      voiceWrapper.appendChild(playBtn);
-      voiceWrapper.appendChild(progressContainer);
-      voiceWrapper.appendChild(timeLabel);
-
-      div.appendChild(voiceWrapper);
+      audio.className = 'voice-player';
+      div.appendChild(audio);
     }
 
     messagesEl.appendChild(div);
