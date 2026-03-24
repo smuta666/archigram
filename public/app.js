@@ -44,7 +44,8 @@ const typingIndicator = document.getElementById('typing-indicator');
 const recordVoiceBtn = document.getElementById('record-voice-btn');
 const stopVoiceBtn = document.getElementById('stop-voice-btn');
 const voiceStatus = document.getElementById('voice-status');
-
+const voiceStatusText = document.getElementById('voice-status-text');
+const clearVoiceBtn = document.getElementById('clear-voice-btn');
 const openProfileBtn = document.getElementById('open-profile-btn');
 const profileModal = document.getElementById('profile-modal');
 const profileBackdrop = document.getElementById('profile-backdrop');
@@ -239,7 +240,7 @@ async function startVoiceRecording() {
 
       stream.getTracks().forEach(track => track.stop());
 
-      voiceStatus.textContent = 'Голосовое записано, нажми "Отправить"';
+      voiceStatusText.textContent = 'Голосовое записано, нажми "Отправить"';
       voiceStatus.classList.remove('hidden');
       state.isRecording = false;
       recordVoiceBtn.classList.remove('hidden');
@@ -249,7 +250,7 @@ async function startVoiceRecording() {
     mediaRecorder.start();
     state.isRecording = true;
 
-    voiceStatus.textContent = 'Идёт запись...';
+    voiceStatusText.textContent = 'Идёт запись...';
     voiceStatus.classList.remove('hidden');
     recordVoiceBtn.classList.add('hidden');
     stopVoiceBtn.classList.remove('hidden');
@@ -266,12 +267,21 @@ function stopVoiceRecording() {
 }
 
 function resetVoiceRecording() {
+  if (state.mediaRecorder && state.isRecording) {
+    try {
+      state.mediaRecorder.stop();
+    } catch {}
+  }
+
   state.mediaRecorder = null;
   state.voiceChunks = [];
   state.voiceBlob = null;
+  state.voiceMimeType = '';
   state.isRecording = false;
-  voiceStatus.textContent = '';
+
+  voiceStatusText.textContent = '';
   voiceStatus.classList.add('hidden');
+
   recordVoiceBtn.classList.remove('hidden');
   stopVoiceBtn.classList.add('hidden');
 }
@@ -367,6 +377,10 @@ recordVoiceBtn?.addEventListener('click', async () => {
 
 stopVoiceBtn?.addEventListener('click', () => {
   stopVoiceRecording();
+});
+
+clearVoiceBtn?.addEventListener('click', () => {
+  resetVoiceRecording();
 });
 
 window.addEventListener('resize', () => {

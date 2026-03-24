@@ -827,6 +827,46 @@ button {
   font-size: 15px;
 }
 
+.voice-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px 12px;
+}
+
+.clear-voice-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+}
+
+.clear-voice-btn:hover {
+  opacity: 0.85;
+}
+
+@media (max-width: 900px) {
+  .voice-status {
+    padding: 0 14px 10px;
+    gap: 10px;
+  }
+
+  .clear-voice-btn {
+    font-size: 11px;
+  }
+
+  .clear-voice-btn span {
+    display: none;
+  }
+}
+
 @media (max-width: 900px) {
   html,
   body {
