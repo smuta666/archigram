@@ -498,6 +498,7 @@ button {
   max-width: 100%;
   display: block;
   margin-top: 6px;
+  border-radius: 999px;
 }
 
 .message.mine audio,
